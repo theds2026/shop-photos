@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Shop Photos</title>
+<meta name="theme-color" content="#f26a1b">
+<meta name="description" content="Sort shop photos by project and sub-category, then export a renamed, foldered zip.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE: practical shop tool, big glove-friendly targets, no fuss
+   IDEA: manila job tags hanging on a pegboard, one per project
+   PICTURE: the live photo grid itself, filed by sub-category chips
+   COLOUR and TYPE: white/graphite, manila tags, safety-orange accent; Barlow Condensed + Barlow
+   LAYOUT: one column, sticky header, thumb-reach action bar at the bottom */
+:root{color-scheme:light dark;--bg:light-dark(#ffffff,#141619);--panel:light-dark(#f0f1f3,#1f2226);--line:light-dark(#d6dade,#32373d);--ink:light-dark(#15181b,#eceef0);--mut:light-dark(#56606b,#9ea8b3);--acc:#f26a1b;--acc-ink:#1a0d04;--tag:light-dark(#ecd8ac,#4b3e25);--bad:light-dark(#c02c1b,#ff8270)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Barlow,system-ui,sans-serif;overflow-x:clip}
+h1,h2,.cond{font-family:'Barlow Condensed',Barlow,sans-serif;font-weight:700;line-height:1.05}
+.top{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:8px;padding:10px max(4vw,12px);background:var(--bg);border-bottom:1px solid var(--line)}
+.top h1{font-size:30px;margin:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+button{font:inherit;color:inherit;cursor:pointer;min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--panel);padding:0 14px;font-weight:600}
+button:disabled{opacity:.45;cursor:default}
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.primary{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
+.danger{color:var(--bad);border-color:currentColor;background:transparent}
+.icon{width:44px;flex:none;padding:0;font-size:24px;line-height:1}
+.wrap{max-width:920px;margin:0 auto;padding:16px max(4vw,12px) 130px}
+.lede{color:var(--mut);margin:2px 0 16px;max-width:60ch}
+.big{width:100%;min-height:58px;font-size:19px}
+.plist{display:grid;gap:12px;margin-top:16px;grid-template-columns:repeat(auto-fill,minmax(min(100%,270px),1fr))}
+.pcard{position:relative;display:grid;gap:4px;text-align:left;padding:14px 14px 14px 46px;background:var(--tag);border:0;border-radius:6px 14px 14px 6px;clip-path:polygon(18px 0,100% 0,100% 100%,18px 100%,0 calc(100% - 18px),0 18px);box-shadow:0 2px 0 rgba(0,0,0,.12)}
+.pcard::before{content:'';position:absolute;left:16px;top:50%;width:14px;height:14px;margin-top:-7px;border-radius:50%;background:var(--bg);box-shadow:inset 0 1px 2px rgba(0,0,0,.35)}
+.pcard b{font-family:'Barlow Condensed',sans-serif;font-size:26px;line-height:1.05}
+.meta{color:inherit;opacity:.75;font-size:15px}
+.strip{display:flex;gap:4px;margin-top:6px}.strip img{width:54px;height:54px;object-fit:cover;border-radius:6px;background:var(--panel)}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 12px;margin:0 -2px}
+.chip{flex:none;border-radius:999px;white-space:nowrap}
+.chip.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chip small{opacity:.7;margin-left:6px;font-size:14px}
+.chip.add{border-style:dashed;background:transparent}
+.tools{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}
+.hint{color:var(--mut);margin:0;font-size:15px}
+.hint b{color:var(--ink)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:6px}
+.ph{position:relative;aspect-ratio:1;padding:0;border:0;border-radius:8px;overflow:hidden;background:var(--panel)}
+.ph img{width:100%;height:100%;object-fit:cover;display:block}
+.lab{position:absolute;left:4px;bottom:4px;max-width:calc(100% - 8px);background:rgba(0,0,0,.62);color:#fff;font-size:13px;font-weight:500;padding:1px 7px;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ck{position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,.4);border:2px solid #fff}
+.ph.sel{outline:4px solid var(--acc);outline-offset:-4px}.ph.sel .ck{background:var(--acc)}
+.bar{position:fixed;left:0;right:0;bottom:0;z-index:5;display:flex;gap:8px;padding:10px max(4vw,12px) calc(10px + env(safe-area-inset-bottom));background:var(--bg);border-top:1px solid var(--line)}
+.bar[hidden]{display:none}
+.bar button{flex:1;min-height:58px;font-size:17px}
+.empty{border:2px dashed var(--line);border-radius:14px;padding:28px 18px;text-align:center;color:var(--mut);margin-top:16px}
+.note{color:var(--mut);font-size:14px;margin-top:28px;max-width:62ch}
+.modal{position:fixed;inset:0;z-index:10;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center}
+.modal[hidden]{display:none}
+.sheet{background:var(--bg);width:100%;max-width:640px;max-height:94vh;overflow:auto;border-radius:16px 16px 0 0;padding:18px max(4vw,16px) calc(18px + env(safe-area-inset-bottom))}
+@media(min-width:700px){.modal{align-items:center}.sheet{border-radius:16px}}
+.sheet h2{font-size:32px;margin:0 0 10px;text-wrap:balance}
+label.f{display:block;font-weight:600;margin:14px 0 6px}
+input[type=text],textarea,select{width:100%;font:inherit;font-size:16px;padding:10px 12px;min-height:46px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--ink)}
+.row{display:flex;gap:8px;align-items:center;margin-top:8px}.row>input{flex:1}
+.nav{display:flex;gap:8px;align-items:center;margin-top:10px}.nav button{flex:1}.mid{flex:1;text-align:center;color:var(--mut);white-space:nowrap}
+.actions{display:flex;gap:8px;margin-top:18px;flex-wrap:wrap}.actions button{flex:1 1 140px;min-height:52px}
+.viewer img{width:100%;max-height:52vh;object-fit:contain;background:#000;border-radius:10px;display:block}
+.opt{display:flex;gap:12px;align-items:center;padding:12px 14px;border:1px solid var(--line);border-radius:10px;margin-top:8px;font-weight:500;cursor:pointer}
+.opt input{width:22px;height:22px;flex:none;accent-color:var(--acc)}
+.opt .cnt{margin-left:auto;color:var(--mut)}
+.mono{font-family:ui-monospace,Menlo,monospace;font-size:14px;overflow-wrap:anywhere;background:var(--panel);padding:10px 12px;border-radius:8px}
+.toast{position:fixed;left:50%;bottom:96px;z-index:20;transform:translate(-50%,16px);opacity:0;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;max-width:90vw;pointer-events:none;transition:opacity .2s,transform .2s}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+@media(prefers-reduced-motion:reduce){.toast{transition:none}}
+</style>
+</head>
+<body>
+<header class="top">
+  <button id="back" class="icon" data-act="back" aria-label="All projects" hidden>‹</button>
+  <h1 id="title">Shop Photos</h1>
+  <div id="topActions" style="display:flex;gap:8px"></div>
+</header>
+<main id="app"></main>
+<div id="bar" class="bar" hidden></div>
+<input type="file" id="cam" accept="image/*" capture="environment" hidden>
+<input type="file" id="pick" accept="image/*" multiple hidden>
+<input type="file" id="restore" accept=".zip,application/zip" hidden>
+<div id="modal" class="modal" hidden><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script>
+{
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+const enc=new TextEncoder();
+
+/* ---------- storage (IndexedDB, falls back to memory) ---------- */
+let db=null;const mem={projects:new Map(),photos:new Map()};
+const openDB=()=>new Promise(res=>{try{const r=indexedDB.open('shop-photo-sorter',1);r.onupgradeneeded=()=>{const d=r.result;d.createObjectStore('projects',{keyPath:'id'});d.createObjectStore('photos',{keyPath:'id'}).createIndex('project','projectId')};r.onsuccess=()=>res(r.result);r.onerror=()=>res(null)}catch(e){res(null)}});
+const tx=(store,mode,fn)=>new Promise((res,rej)=>{const t=db.transaction(store,mode);let out;const r=fn(t.objectStore(store));if(r)r.onsuccess=()=>{out=r.result};t.oncomplete=()=>res(out);t.onerror=()=>rej(t.error);t.onabort=()=>rej(t.error)});
+const S={
+  all:s=>db?tx(s,'readonly',o=>o.getAll()):Promise.resolve([...mem[s].values()]),
+  put:(s,v)=>db?tx(s,'readwrite',o=>o.put(v)):(mem[s].set(v.id,v),Promise.resolve()),
+  del:(s,id)=>db?tx(s,'readwrite',o=>o.delete(id)):(mem[s].delete(id),Promise.resolve()),
+  byProject:pid=>db?tx('photos','readonly',o=>o.index('project').getAll(pid)):Promise.resolve([...mem.photos.values()].filter(p=>p.projectId===pid))
+};
+
+/* ---------- state + helpers ---------- */
+const st={proj:null,photos:[],filter:'all',sel:null,ask:null,vi:null,viewUrl:null};
+const urls=new Map();
+const turl=p=>{let u=urls.get(p.id);if(!u){u=URL.createObjectURL(p.thumb||p.blob);urls.set(p.id,u)}return u};
+const drop=id=>{const u=urls.get(id);if(u){URL.revokeObjectURL(u);urls.delete(id)}};
+let installEvt=null;
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installEvt=e;if(!st.proj&&st.ready)home()});
+window.addEventListener('appinstalled',()=>{installEvt=null;toast('Installed. Open it from your home screen.')});
+const mimeOf=e=>({jpg:'image/jpeg',png:'image/png',webp:'image/webp',heic:'image/heic',heif:'image/heif',gif:'image/gif'}[e]||'image/jpeg');
+const subName=id=>(id&&st.proj.subs.find(s=>s.id===id)?.name)||'Unsorted';
+const plural=(n,w,ws)=>n+' '+(n===1?w:(ws||w+'s'));
+const ymd=t=>{const d=new Date(t);return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')};
+const slug=s=>String(s).trim().replace(/[\\/:*?"<>|#%&{}$!'@+`=^~\[\];,]/g,'').replace(/\s+/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,'')||'Untitled';
+const extOf=f=>{let m=(f.name||'').match(/\.([a-z0-9]{2,5})$/i);let e=m?m[1].toLowerCase():({'image/png':'png','image/webp':'webp','image/heic':'heic','image/gif':'gif'}[f.type]||'jpg');return e==='jpeg'?'jpg':e};
+const fileName=(sub,n,taken,ext,withDate)=>[slug(st.proj.name),slug(sub),String(n).padStart(3,'0'),withDate?ymd(taken):''].filter(Boolean).join('_')+'.'+ext;
+
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove('on'),2600)}
+function openModal(html){const s=$('#sheet');s.onchange=null;s.innerHTML=html;$('#modal').hidden=false}
+function closeModal(){$('#modal').hidden=true;$('#sheet').innerHTML='';if(st.viewUrl){URL.revokeObjectURL(st.viewUrl);st.viewUrl=null}if(st.ask){const r=st.ask;st.ask=null;r(false)}}
+function ask(title,msg,ok){return new Promise(res=>{openModal(`<h2>${esc(title)}</h2><p>${esc(msg)}</p><div class="actions"><button data-act="ask" data-v="0">Cancel</button><button class="primary danger-solid" data-act="ask" data-v="1">${esc(ok)}</button></div>`);st.ask=res})}
+function info(title,msg){openModal(`<h2>${esc(title)}</h2><p>${esc(msg)}</p><div class="actions"><button class="primary" data-act="close">OK</button></div>`)}
+function setTop(title,back,actions){$('#title').textContent=title;$('#back').hidden=!back;$('#topActions').innerHTML=actions}
+
+async function makeThumb(f){try{const b=await createImageBitmap(f);const k=Math.min(1,360/Math.max(b.width,b.height));const c=document.createElement('canvas');c.width=Math.round(b.width*k);c.height=Math.round(b.height*k);c.getContext('2d').drawImage(b,0,0,c.width,c.height);if(b.close)b.close();return await new Promise(r=>c.toBlob(r,'image/jpeg',.78))}catch(e){return null}}
+
+/* ---------- zip writer (stored, no compression: photos are already compressed) ---------- */
+const CRC=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
+const crc32=u=>{let c=0xFFFFFFFF;for(let i=0;i<u.length;i++)c=CRC[(c^u[i])&255]^(c>>>8);return(c^0xFFFFFFFF)>>>0};
+function Zip(){const parts=[],cen=[];let off=0;
+  const dos=t=>{const d=new Date(t);return{time:(d.getHours()<<11)|(d.getMinutes()<<5)|(d.getSeconds()>>1),date:((Math.max(d.getFullYear(),1980)-1980)<<9)|((d.getMonth()+1)<<5)|d.getDate()}};
+  return{
+    async add(name,blob,t){const buf=new Uint8Array(await blob.arrayBuffer());const crc=crc32(buf),size=buf.length,nb=enc.encode(name),{time,date}=dos(t||Date.now());
+      const h=new DataView(new ArrayBuffer(30));h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(8,0,true);h.setUint16(10,time,true);h.setUint16(12,date,true);h.setUint32(14,crc,true);h.setUint32(18,size,true);h.setUint32(22,size,true);h.setUint16(26,nb.length,true);h.setUint16(28,0,true);
+      parts.push(h.buffer,nb,blob);cen.push({nb,crc,size,off,time,date});off+=30+nb.length+size},
+    done(){let cs=0;const cp=[];for(const e of cen){const c=new DataView(new ArrayBuffer(46));c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint16(10,0,true);c.setUint16(12,e.time,true);c.setUint16(14,e.date,true);c.setUint32(16,e.crc,true);c.setUint32(20,e.size,true);c.setUint32(24,e.size,true);c.setUint16(28,e.nb.length,true);c.setUint32(42,e.off,true);cp.push(c.buffer,e.nb);cs+=46+e.nb.length}
+      const z=new DataView(new ArrayBuffer(22));z.setUint32(0,0x06054b50,true);z.setUint16(8,cen.length,true);z.setUint16(10,cen.length,true);z.setUint32(12,cs,true);z.setUint32(16,off,true);
+      return new Blob([...parts,...cp,z.buffer],{type:'application/zip'})}
+  }}
+
+async function saveFile(name,blob){
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),60000);toast('Saved to Downloads: '+name);return true}
+
+/* ---------- views ---------- */
+async function home(){
+  st.proj=null;st.sel=null;$('#bar').hidden=true;
+  const ps=(await S.all('projects')).sort((a,b)=>b.updated-a.updated);
+  const by={};(await S.all('photos')).forEach(p=>(by[p.projectId]=by[p.projectId]||[]).push(p));
+  setTop('Shop Photos',false,'');
+  $('#app').innerHTML=`<div class="wrap">
+    <p class="lede">File shop photos by project and sub-category as you take them, then export a project as a zip with a folder per sub-category and every file renamed.</p>
+    ${installEvt?'<button class="big" data-act="install" style="margin-bottom:10px">Install as an app on this phone</button>':''}
+    <button class="big primary" data-act="newProject">+ New project</button>
+    ${ps.length?`<div class="plist">${ps.map(p=>{const l=(by[p.id]||[]).sort((a,b)=>b.taken-a.taken);return`<button class="pcard" data-act="open" data-id="${esc(p.id)}"><b>${esc(p.name)}</b><span class="meta">${plural(l.length,'photo')} · ${plural(p.subs.length,'sub-category','sub-categories')}</span>${l.length?`<span class="strip">${l.slice(0,4).map(x=>`<img alt="" src="${turl(x)}">`).join('')}</span>`:''}</button>`}).join('')}</div>`
+    :`<div class="empty"><p class="cond" style="font-size:28px;color:var(--ink);margin:0 0 6px">No projects yet</p>Start one for whatever’s on the bench right now.</div>`}
+    <div class="actions" style="margin-top:28px"><button data-act="backup" ${ps.length?'':'disabled'}>Back up everything</button><button data-act="restore">Restore from backup</button></div>
+    <p class="note">${db?'Photos are kept inside this app on this phone.':'This browser blocked storage, so photos here disappear when you close the page.'} Your originals stay in your gallery either way. A backup is one zip of every project that this app can read back in, on this phone or a new one.</p></div>`;
+}
+
+async function openProject(id){
+  const p=(await S.all('projects')).find(x=>x.id===id);if(!p)return home();
+  st.proj=p;st.photos=await S.byProject(id);st.filter='all';st.sel=null;
+  const ids=new Set(p.subs.map(s=>s.id));st.photos.forEach(x=>{if(x.subId&&!ids.has(x.subId))x.subId=null});
+  renderProject();window.scrollTo(0,0);
+}
+const visible=()=>st.photos.filter(x=>st.filter==='all'||(st.filter==='none'?!x.subId:x.subId===st.filter)).sort((a,b)=>b.taken-a.taken);
+
+function renderProject(){
+  const p=st.proj,cnt={};st.photos.forEach(x=>{const k=x.subId||'none';cnt[k]=(cnt[k]||0)+1});
+  setTop(p.name,true,`<button class="primary" data-act="export">Export</button><button class="icon" data-act="editProject" aria-label="Edit project">⋯</button>`);
+  const chips=[{k:'all',n:'All',c:st.photos.length},...p.subs.map(s=>({k:s.id,n:s.name,c:cnt[s.id]||0}))];
+  if(cnt.none||st.filter==='none')chips.push({k:'none',n:'Unsorted',c:cnt.none||0});
+  const list=visible(),target=st.filter==='all'||st.filter==='none'?'Unsorted':subName(st.filter);
+  const hint=st.filter==='all'?`New photos go to <b>Unsorted</b>. Tap a sub-category first to file them there.`:`New photos go to <b>${esc(target)}</b>.`;
+  $('#app').innerHTML=`<div class="wrap">
+    <div class="chips" role="tablist">${chips.map(c=>`<button class="chip${st.filter===c.k?' on':''}" role="tab" aria-selected="${st.filter===c.k}" data-act="filter" data-k="${esc(c.k)}">${esc(c.n)}<small>${c.c}</small></button>`).join('')}<button class="chip add" data-act="addSub">+ Sub-category</button></div>
+    <div class="tools"><p class="hint">${st.sel?`Tap photos to select them. ${st.sel.size} selected.`:hint}</p>${list.length&&!st.sel?'<button data-act="select">Select</button>':''}</div>
+    ${list.length?`<div class="grid">${list.map(x=>`<button class="ph${st.sel&&st.sel.has(x.id)?' sel':''}" data-act="photo" data-id="${esc(x.id)}" aria-label="Photo in ${esc(subName(x.subId))}"><img loading="lazy" alt="" src="${turl(x)}">${st.filter==='all'?`<span class="lab">${esc(subName(x.subId))}</span>`:''}${st.sel?'<span class="ck"></span>':''}</button>`).join('')}</div>`
+    :`<div class="empty">No photos here yet. Use the buttons below to take one or add some from your gallery.</div>`}</div>`;
+  const bar=$('#bar');bar.hidden=false;
+  bar.innerHTML=st.sel?`<button data-act="selDone">Done</button><button data-act="selMove" ${st.sel.size?'':'disabled'}>Move ${st.sel.size||''}</button><button class="danger" data-act="selDel" ${st.sel.size?'':'disabled'}>Delete</button>`
+    :`<button class="primary" data-act="cam">Take photo</button><button data-act="pick">Add from gallery</button>`;
+}
+
+async function addFiles(files){
+  const p=st.proj,subId=st.filter!=='all'&&st.filter!=='none'?st.filter:null;let n=0;
+  toast('Saving '+plural(files.length,'photo')+'…');
+  try{for(const f of files){if(!f.type.startsWith('image/')&&!/\.(jpe?g|png|webp|heic|heif|gif)$/i.test(f.name))continue;
+      const rec={id:uid(),projectId:p.id,subId,blob:f,thumb:await makeThumb(f),taken:f.lastModified||Date.now(),added:Date.now(),note:'',ext:extOf(f)};
+      await S.put('photos',rec);st.photos.push(rec);n++}
+  }catch(e){info('Couldn’t save every photo','Your phone may be low on space for this browser. '+n+' saved.')}
+  p.updated=Date.now();await S.put('projects',p);renderProject();if(n)toast('Added '+plural(n,'photo')+' to '+subName(subId));
+}
+
+/* ---------- project form ---------- */
+const rowHtml=s=>`<div class="row srow"><input type="text" value="${esc(s.name)}" data-sid="${esc(s.id||'')}" aria-label="Sub-category name" autocomplete="off"><button class="icon" data-act="delRow" aria-label="Remove sub-category">×</button></div>`;
+function projectForm(p){
+  st.editing=p;
+  const subs=p?p.subs:['Before','In progress','Parts & receipts','Finished'].map(name=>({name}));
+  openModal(`<h2>${p?'Edit project':'New project'}</h2>
+    <label class="f" for="pName">Project name</label><input type="text" id="pName" value="${esc(p?p.name:'')}" placeholder="e.g. Trailer wiring" autocomplete="off">
+    <label class="f">Sub-categories <span class="hint">(become folders in the export)</span></label><div id="subRows">${subs.map(rowHtml).join('')}</div>
+    <button data-act="addRow" style="margin-top:10px">+ Add sub-category</button>
+    ${p?'<p class="hint" style="margin-top:10px">Photos in a removed sub-category move to Unsorted.</p>':''}
+    <div class="actions">${p?'<button class="danger" data-act="delProject">Delete project</button>':''}<button data-act="close">Cancel</button><button class="primary" data-act="saveProject">${p?'Save':'Create project'}</button></div>`);
+  if(!p)$('#pName').focus();
+}
+async function saveProject(){
+  const name=$('#pName').value.trim();if(!name){toast('Give the project a name');$('#pName').focus();return}
+  const subs=[...document.querySelectorAll('#subRows input')].map(i=>({id:i.dataset.sid||uid(),name:i.value.trim()})).filter(s=>s.name);
+  const now=Date.now();let p;
+  if(st.editing){p={...st.editing,name,subs,updated:now};const keep=new Set(subs.map(s=>s.id));
+    for(const x of st.photos)if(x.subId&&!keep.has(x.subId)){x.subId=null;await S.put('photos',x)}}
+  else p={id:uid(),name,subs,created:now,updated:now};
+  await S.put('projects',p);st.editing=null;closeModal();
+  if(st.proj&&st.proj.id===p.id){st.proj=p;if(st.filter!=='all'&&st.filter!=='none'&&!subs.some(s=>s.id===st.filter))st.filter='all';renderProject()}else openProject(p.id);
+}
+
+/* ---------- photo viewer ---------- */
+function drawViewer(){
+  const {list,i}=st.vi,p=st.photos.find(x=>x.id===list[i]);if(!p){closeModal();return}
+  if(st.viewUrl)URL.revokeObjectURL(st.viewUrl);st.viewUrl=URL.createObjectURL(p.blob);
+  openModal(`<div class="viewer"><img src="${st.viewUrl}" alt="Photo">
+    <div class="nav"><button data-act="vPrev" ${i?'':'disabled'}>‹ Prev</button><span class="mid">${i+1} of ${list.length}</span><button data-act="vNext" ${i<list.length-1?'':'disabled'}>Next ›</button></div>
+    <label class="f" for="vSub">Sub-category</label><select id="vSub"><option value="">Unsorted</option>${st.proj.subs.map(s=>`<option value="${esc(s.id)}"${s.id===p.subId?' selected':''}>${esc(s.name)}</option>`).join('')}</select>
+    <label class="f" for="vNote">Note</label><textarea id="vNote" rows="2" placeholder="Optional. Goes into notes.txt when you export.">${esc(p.note)}</textarea>
+    <p class="hint" style="margin-top:8px">Taken ${esc(new Date(p.taken).toLocaleString())}</p>
+    <div class="actions"><button class="danger" data-act="vDel">Delete photo</button><button class="primary" data-act="close">Done</button></div></div>`);
+  $('#vSub').onchange=async()=>{p.subId=$('#vSub').value||null;await S.put('photos',p);renderProject();toast('Moved to '+subName(p.subId))};
+  $('#vNote').onchange=async()=>{p.note=$('#vNote').value;await S.put('photos',p)};
+}
+
+/* ---------- export ---------- */
+function scopeItems(scope){
+  const subs=st.proj.subs,groups=[...subs.map(s=>({id:s.id,name:s.name})),{id:null,name:'Unsorted'}];
+  return groups.filter(g=>scope==='all'||(scope==='none'?g.id===null:g.id===scope))
+    .map(g=>({name:g.name,items:st.photos.filter(x=>(x.subId||null)===g.id).sort((a,b)=>a.taken-b.taken)})).filter(g=>g.items.length);
+}
+function exportModal(){
+  if(!st.photos.length){info('Nothing to export yet','Add some photos to this project first.');return}
+  const cnt={};st.photos.forEach(x=>{const k=x.subId||'none';cnt[k]=(cnt[k]||0)+1});
+  const opts=[{k:'all',n:'Whole project',c:st.photos.length},...st.proj.subs.filter(s=>cnt[s.id]).map(s=>({k:s.id,n:s.name,c:cnt[s.id]}))];
+  if(cnt.none)opts.push({k:'none',n:'Unsorted',c:cnt.none});
+  openModal(`<h2>Export ${esc(st.proj.name)}</h2>
+    <p class="hint">You’ll get a zip with a folder for each sub-category, and every photo renamed by project and sub-category, numbered in the order taken.</p>
+    ${opts.map((o,i)=>`<label class="opt"><input type="radio" name="scope" value="${esc(o.k)}"${i?'':' checked'}><span>${esc(o.n)}</span><span class="cnt">${o.c}</span></label>`).join('')}
+    <label class="opt"><input type="checkbox" id="xDate" checked><span>Add the date taken (yyyymmdd) to the end of each filename</span></label>
+    <label class="f">Inside the zip</label><div class="mono" id="xEx"></div>
+    <p class="hint" id="xProg" style="margin-top:10px"></p>
+    <div class="actions"><button data-act="close">Cancel</button>${navigator.canShare?'<button data-act="doShare" id="xShare">Share photos</button>':''}<button class="primary" data-act="doExport" id="xGo">Download zip</button></div>
+    ${navigator.canShare?'<p class="hint" style="margin-top:10px">Share photos sends the renamed photos straight to Drive, Gmail or a text, without folders. Download zip keeps the folders.</p>':''}`);
+  const upd=()=>{const g=scopeItems(document.querySelector('[name=scope]:checked').value)[0];if(!g)return;const x=g.items[0];
+    $('#xEx').textContent=slug(st.proj.name)+'/'+slug(g.name)+'/'+fileName(g.name,1,x.taken,x.ext||'jpg',$('#xDate').checked)};
+  $('#sheet').onchange=upd;upd();
+}
+async function doExport(){
+  const scope=document.querySelector('[name=scope]:checked').value,withDate=$('#xDate').checked,go=$('#xGo'),prog=$('#xProg');
+  const groups=scopeItems(scope),total=groups.reduce((a,g)=>a+g.items.length,0),root=slug(st.proj.name);
+  go.disabled=true;const z=Zip();let done=0;const notes=[];
+  try{for(const g of groups){let n=0;for(const x of g.items){n++;const path=root+'/'+slug(g.name)+'/'+fileName(g.name,n,x.taken,x.ext||'jpg',withDate);
+      await z.add(path,x.blob,x.taken);if(x.note&&x.note.trim())notes.push(path.slice(root.length+1)+': '+x.note.trim());
+      prog.textContent='Packing '+(++done)+' of '+total+'…'}}
+    if(notes.length)await z.add(root+'/notes.txt',new Blob([st.proj.name+' notes\r\n\r\n'+notes.join('\r\n')+'\r\n']),Date.now());
+    const blob=z.done(),sub=scope==='all'?'':'_'+slug(scope==='none'?'Unsorted':subName(scope));
+    prog.textContent='Zip ready ('+(blob.size/1048576).toFixed(1)+' MB).';
+    if(await saveFile(root+sub+'.zip',blob))closeModal();else go.disabled=false;
+  }catch(e){prog.textContent='';go.disabled=false;info('Export failed',(e&&e.message)||'Something went wrong while building the zip.')}
+}
+
+async function doShare(){
+  const scope=document.querySelector('[name=scope]:checked').value,withDate=$('#xDate').checked,files=[];
+  for(const g of scopeItems(scope)){let n=0;for(const x of g.items){n++;const ext=x.ext||'jpg';files.push(new File([x.blob],fileName(g.name,n,x.taken,ext,withDate),{type:x.blob.type||mimeOf(ext),lastModified:x.taken}))}}
+  if(!navigator.canShare({files})){info('Can’t share these','Your phone won’t share this many photos at once. Try one sub-category, or use Download zip.');return}
+  try{await navigator.share({files,title:st.proj.name});closeModal()}catch(e){if(e&&e.name!=='AbortError')info('Share failed',e.message||'Something went wrong.')}
+}
+
+/* ---------- backup + restore ---------- */
+async function backup(){
+  const projects=await S.all('projects'),photos=await S.all('photos'),z=Zip(),meta=[];
+  toast('Building backup…');
+  try{let i=0;for(const x of photos){const ext=x.ext||'jpg',file='photos/'+x.id+'.'+ext;await z.add(file,x.blob,x.taken);
+      meta.push({id:x.id,projectId:x.projectId,subId:x.subId||null,taken:x.taken,added:x.added,note:x.note||'',ext,file});if(++i%10===0)toast('Backing up '+i+' of '+photos.length+'…')}
+    await z.add('backup.json',new Blob([JSON.stringify({app:'shop-photos',version:1,created:Date.now(),projects,photos:meta})]),Date.now());
+    await saveFile('Shop-Photos-backup_'+ymd(Date.now())+'.zip',z.done());
+  }catch(e){info('Backup failed',(e&&e.message)||'Something went wrong.')}
+}
+async function readZip(file){
+  const tail=new Uint8Array(await file.slice(Math.max(0,file.size-65558)).arrayBuffer());let e=-1;
+  for(let i=tail.length-22;i>=0;i--)if(tail[i]===0x50&&tail[i+1]===0x4b&&tail[i+2]===5&&tail[i+3]===6){e=i;break}
+  if(e<0)throw new Error('That file isn’t a zip.');
+  const ev=new DataView(tail.buffer,e),count=ev.getUint16(10,true),cdSize=ev.getUint32(12,true),cdOff=ev.getUint32(16,true);
+  const cd=new DataView(await file.slice(cdOff,cdOff+cdSize).arrayBuffer()),dec=new TextDecoder(),out=new Map();let p=0;
+  for(let k=0;k<count;k++){if(cd.getUint32(p,true)!==0x02014b50)break;
+    const method=cd.getUint16(p+10,true),size=cd.getUint32(p+20,true),nl=cd.getUint16(p+28,true),xl=cd.getUint16(p+30,true),cl=cd.getUint16(p+32,true),lho=cd.getUint32(p+42,true);
+    const name=dec.decode(new Uint8Array(cd.buffer,p+46,nl));p+=46+nl+xl+cl;
+    if(method!==0)continue;
+    const lh=new DataView(await file.slice(lho,lho+30).arrayBuffer()),start=lho+30+lh.getUint16(26,true)+lh.getUint16(28,true);
+    out.set(name,{start,size})}
+  return out;
+}
+async function restore(file){
+  try{const ents=await readZip(file),j=ents.get('backup.json');
+    if(!j)throw new Error('That zip isn’t a Shop Photos backup. (Project exports can’t be restored, only backups.)');
+    const data=JSON.parse(await file.slice(j.start,j.start+j.size).text());
+    const have=new Map((await S.all('projects')).map(p=>[p.id,p])),havePh=new Set((await S.all('photos')).map(p=>p.id));
+    let np=0,nf=0,i=0;
+    for(const p of data.projects||[]){const cur=have.get(p.id);
+      if(cur){const ids=new Set(cur.subs.map(s=>s.id));for(const s of p.subs)if(!ids.has(s.id))cur.subs.push(s);await S.put('projects',cur)}else{await S.put('projects',p);np++}}
+    for(const m of data.photos||[]){i++;if(havePh.has(m.id))continue;const ent=ents.get(m.file);if(!ent)continue;
+      const blob=new Blob([await file.slice(ent.start,ent.start+ent.size).arrayBuffer()],{type:mimeOf(m.ext)});
+      const {file:_f,...rest}=m;await S.put('photos',{...rest,blob,thumb:await makeThumb(blob)});nf++;
+      if(i%10===0)toast('Restoring '+i+' of '+data.photos.length+'…')}
+    await home();info('Restore finished','Added '+plural(np,'new project')+' and '+plural(nf,'photo')+'. Anything already in the app was left as it was.');
+  }catch(e){info('Couldn’t restore',(e&&e.message)||'Something went wrong.')}
+}
+
+/* ---------- events ---------- */
+document.addEventListener('click',async e=>{
+  if(e.target===$('#modal')){closeModal();return}
+  const b=e.target.closest('[data-act]');if(!b||b.disabled)return;const id=b.dataset.id;
+  switch(b.dataset.act){
+    case 'back':home();break;
+    case 'newProject':projectForm(null);break;
+    case 'open':openProject(id);break;
+    case 'editProject':projectForm(st.proj);break;
+    case 'close':closeModal();break;
+    case 'ask':{const r=st.ask;st.ask=null;closeModal();if(r)r(b.dataset.v==='1');break}
+    case 'addRow':{$('#subRows').insertAdjacentHTML('beforeend',rowHtml({name:''}));const ins=document.querySelectorAll('#subRows input');ins[ins.length-1].focus();break}
+    case 'delRow':b.closest('.srow').remove();break;
+    case 'saveProject':saveProject();break;
+    case 'delProject':{const p=st.editing;if(!await ask('Delete “'+p.name+'”?','This removes the project and its '+plural(st.photos.length,'photo')+' from this app. The originals in your gallery are not touched.','Delete project'))return;
+      for(const x of await S.byProject(p.id)){drop(x.id);await S.del('photos',x.id)}await S.del('projects',p.id);st.editing=null;home();break}
+    case 'filter':st.filter=b.dataset.k;renderProject();break;
+    case 'addSub':openModal(`<h2>New sub-category</h2><label class="f" for="subName">Name</label><input type="text" id="subName" placeholder="e.g. Wiring" autocomplete="off"><div class="actions"><button data-act="close">Cancel</button><button class="primary" data-act="saveSub">Add</button></div>`);$('#subName').focus();break;
+    case 'saveSub':{const n=$('#subName').value.trim();if(!n)return;const s={id:uid(),name:n};st.proj.subs.push(s);st.proj.updated=Date.now();await S.put('projects',st.proj);st.filter=s.id;closeModal();renderProject();break}
+    case 'cam':$('#cam').click();break;
+    case 'pick':$('#pick').click();break;
+    case 'select':st.sel=new Set();renderProject();break;
+    case 'selDone':st.sel=null;renderProject();break;
+    case 'photo':if(st.sel){st.sel.has(id)?st.sel.delete(id):st.sel.add(id);renderProject()}else{const l=visible().map(x=>x.id);st.vi={list:l,i:l.indexOf(id)};drawViewer()}break;
+    case 'selMove':openModal(`<h2>Move ${plural(st.sel.size,'photo')} to…</h2>${[...st.proj.subs.map(s=>({k:s.id,n:s.name})),{k:'none',n:'Unsorted'}].map(o=>`<button class="big" style="margin-top:8px" data-act="moveTo" data-k="${esc(o.k)}">${esc(o.n)}</button>`).join('')}<div class="actions"><button data-act="close">Cancel</button></div>`);break;
+    case 'moveTo':{const sid=b.dataset.k==='none'?null:b.dataset.k;for(const x of st.photos)if(st.sel.has(x.id)){x.subId=sid;await S.put('photos',x)}
+      const n=st.sel.size;st.sel=null;closeModal();renderProject();toast('Moved '+plural(n,'photo')+' to '+subName(sid));break}
+    case 'selDel':{const n=st.sel.size;if(!await ask('Delete '+plural(n,'photo')+'?','They’re removed from this app only. The originals stay in your gallery.','Delete'))return;
+      for(const pid of st.sel){drop(pid);await S.del('photos',pid)}st.photos=st.photos.filter(x=>!st.sel.has(x.id));st.sel=null;renderProject();toast('Deleted '+plural(n,'photo'));break}
+    case 'vPrev':st.vi.i--;drawViewer();break;
+    case 'vNext':st.vi.i++;drawViewer();break;
+    case 'vDel':{const pid=st.vi.list[st.vi.i];if(!await ask('Delete this photo?','It’s removed from this app only. The original stays in your gallery.','Delete'))return drawViewer();
+      drop(pid);await S.del('photos',pid);st.photos=st.photos.filter(x=>x.id!==pid);st.vi.list.splice(st.vi.i,1);renderProject();
+      if(st.vi.list.length){st.vi.i=Math.min(st.vi.i,st.vi.list.length-1);drawViewer()}toast('Photo deleted');break}
+    case 'export':exportModal();break;
+    case 'doExport':doExport();break;
+    case 'doShare':doShare();break;
+    case 'backup':backup();break;
+    case 'restore':$('#restore').click();break;
+    case 'install':if(installEvt){installEvt.prompt();installEvt=null;home()}break;
+  }
+});
+document.addEventListener('keydown',e=>{if($('#modal').hidden)return;
+  if(e.key==='Escape')closeModal();
+  else if(e.key==='Enter'&&e.target.id==='subName'){e.preventDefault();document.querySelector('[data-act=saveSub]').click()}
+  else if(st.vi&&$('.viewer')&&e.target.tagName!=='TEXTAREA'&&e.target.tagName!=='SELECT'){if(e.key==='ArrowLeft'&&st.vi.i>0){st.vi.i--;drawViewer()}if(e.key==='ArrowRight'&&st.vi.i<st.vi.list.length-1){st.vi.i++;drawViewer()}}
+});
+const onFiles=async e=>{const fs=[...e.target.files];e.target.value='';if(fs.length&&st.proj)await addFiles(fs)};
+$('#cam').addEventListener('change',onFiles);$('#pick').addEventListener('change',onFiles);
+$('#restore').addEventListener('change',e=>{const f=e.target.files[0];e.target.value='';if(f)restore(f)});
+if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+
+(async()=>{db=await openDB();st.ready=true;try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{})}catch(e){}home()})();
+}
+</script>
+</body>
+</html>
