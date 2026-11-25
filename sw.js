@@ -1,6 +1,6 @@
 // Shop Photos service worker: lets the app open with no signal.
 // When you change any file, bump VERSION so phones pick up the new copy.
-const VERSION = 'shop-photos-v1';
+const VERSION = 'shop-photos-v2';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png'];
 
 self.addEventListener('install', e => {
